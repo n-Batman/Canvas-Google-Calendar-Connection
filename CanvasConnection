@@ -1,0 +1,167 @@
+package com.snd.CanvasGoogleConnection.CanvasConnection;
+
+import java.net.URI;
+import java.net.URL;
+import java.util.Scanner;
+import javax.net.ssl.HttpsURLConnection;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.io.IOException;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList; 
+
+
+public class CanvasConnection 
+{
+	
+	private static String authentication() throws IOException
+	{
+		
+		return [temporary access token];
+	}
+	
+	public static String getAccountInfo() throws IOException
+	{
+		
+		String apiKey = authentication();
+		URI uri =  URI.create("https://smuhsd.instructure.com/api/v1/users/[User ID]" + "?access_token=" +  apiKey);
+		URL url = uri.toURL();
+		
+		HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+		//conn.setRequestProperty("Authorization", '"' + "Authorization: Bearer " + apiKey + '"');
+		conn.setRequestMethod("GET");
+		
+		String data = "";
+		data = connectAPIGET(url, conn);
+		
+		return data;
+	}
+	public static ArrayList<String> getCourses() throws IOException
+	{
+		String apiKey = authentication();
+		
+		URI uri =  URI.create("https://smuhsd.instructure.com/api/v1/courses?per_page=20"); //Request parameters are added after the ?
+		URL url = uri.toURL(); 
+		
+		HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+		
+		conn.setRequestMethod("GET");
+		conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+		
+		String data = "";
+		data = connectAPIGET(url, conn);
+		
+		//Trimming data to just the active course ID's
+		String[] dataCommaSplit = data.split("\\},\\{"); //splits the csv's into an array
+		ArrayList<String> courseIds = new ArrayList<String>();
+		
+		for (int i = 0; i < dataCommaSplit.length; i++)
+		{
+			if(dataCommaSplit[i].indexOf("\"access_restricted_by_date\":true") == -1)
+			{
+				//System.out.println("i=" + i);
+				courseIds.add(dataCommaSplit[i].substring(dataCommaSplit[i].indexOf("\"id\":") + 5, dataCommaSplit[i].indexOf(",")));
+			}
+		}
+		
+		return courseIds;
+	}
+	public static ArrayList<CanvasAssignment> getAssignments() throws IOException
+	{
+		LocalDate today = LocalDate.now();
+		LocalDate next2Week = today.minus(2, ChronoUnit.WEEKS);
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+	    String formattedDate = next2Week.format(formatter);
+		
+		String apiKey = authentication();
+		
+		ArrayList<String> courseIds = getCourses();
+		System.out.println(courseIds);
+		ArrayList<CanvasAssignment> data = new ArrayList<>();
+		
+		for (int i = 0; i < courseIds.size(); i++)
+		{
+			URI uri =  URI.create("https://smuhsd.instructure.com/api/v1/courses/" + courseIds.get(i) + "/assignments" + "?bucket=future");
+			URL url = uri.toURL();
+		
+			HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+			
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+			
+			String rawData = connectAPIGET(url, conn);
+			rawData = rawData.substring(1, rawData.length() - 1);
+			String[] rawDataSplit = rawData.split("},");//rawData.split(",\"");
+			for (int j = 0; j < rawDataSplit.length; j++) //Have to add a serafch sort to find each part, the for loop checks each part of the code. - can use https://smuhsd.instructure.com/api/v1/courses/41442/assignments?bucket=future to test.
+			{
+				System.out.println(j);
+				//For loop looks through each assignment
+				String[] assignmentSplit = rawDataSplit[j].split(",\"");
+				System.out.println(assignmentSplit[0]);
+				
+				if (assignmentSplit[0].equals(""))
+					break;
+				String dueDate = "null";
+				int id = Integer.parseInt(assignmentSplit[0].substring(7));
+				if (assignmentSplit[2].contains("null"))
+				{
+					dueDate = "null";
+				}
+				else
+				{
+					dueDate = assignmentSplit[2].substring(9, assignmentSplit[2].length() - 2); 
+				}
+				//System.out.println(dueDate + " " + assignmentSplit[2]);
+				String name = assignmentSplit[34].substring(7, assignmentSplit[34].length() - 1);
+				String course = courseIds.get(i);
+				String dataUrl = assignmentSplit[51].substring(11, assignmentSplit[51].length() - 1);
+				
+				System.out.println(dueDate + " " + name);
+				data.add(new CanvasAssignment(id, dueDate, dataUrl, name, course));
+			}
+		}
+		
+		return data;
+	}
+	
+	private static String connectAPIGET(URL url, HttpsURLConnection conn) throws IOException 
+	{	
+		System.out.println(conn.getResponseCode());
+		
+		Scanner scanner = new Scanner(conn.getInputStream());
+		String data = "";
+		try
+		{
+		
+		conn.connect();
+		
+		while (scanner.hasNext())
+			data += scanner.next();
+			
+		}catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		scanner.close();
+		return data;
+	}
+	private static String connectAPIPOST(URL url, HttpsURLConnection conn) throws IOException 
+	{
+		Scanner scanner = new Scanner(conn.getInputStream());
+		String data = "";
+		try
+		{
+		
+		conn.connect();
+		
+		while (scanner.hasNext())
+			data += scanner.next();
+			
+		}catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		scanner.close();
+		return data;
+	}
+}
