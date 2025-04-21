@@ -1,0 +1,70 @@
+package com.snd.CanvasGoogleConnection.CanvasConnection;
+import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
+import com.google.api.services.calendar.model.Event;
+import java.util.Scanner;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.api.client.util.DateTime;
+
+public class App {
+    public static void main(String[] args) throws Exception 
+    {
+        // Use ClassLoader to get the resource as a stream
+        InputStream inputStream = App.class.getClassLoader().getResourceAsStream("googleApiCredentials.json");
+        
+        if (inputStream == null) {
+            throw new RuntimeException("Could not find googleApiCredentials.json in resources");
+        }
+        
+        Scanner scanner = new Scanner(inputStream);
+        while (scanner.hasNextLine()) 
+        {
+            System.out.println(scanner.nextLine());
+        }
+        scanner.close();
+        inputStream.close();
+      
+        connection();
+    }
+    
+    //server sided method, connecting canvas and google caledner, will call the canvas stuff to get the data then send it to the google side to create events
+    public static void connection()
+    {
+    	//get data from canvas
+    	try {
+    	ArrayList<CanvasAssignment> assignments = CanvasConnection.getAssignments();
+    	GoogleCalenderConnection manager = new GoogleCalenderConnection();
+    	
+    	
+    	List<Event> futureEvents = manager.listUpcomingEvents(10);
+    	
+    	System.out.println("got to future events");
+    	
+    	for (int i = 0; i < assignments.size() - 1; i++)
+    	{	
+    		for (int j = 0; j < futureEvents.size(); j++)
+    		{
+    			//System.out.println(i + " " + j);
+    			if (!(assignments.get(i).getName().equals(futureEvents.get(j).getSummary()))) //infinetely repreating because i only check future events before making them
+    			{
+    				manager.createEvent(assignments.get(i).getName(), 
+    						assignments.get(i).getCourse() + " " + assignments.get(i).getId(), 
+    						new DateTime(assignments.get(i).getDueDate()), 
+    						new DateTime(assignments.get(i).getDueDate()));
+    				i++;
+    			}
+    		}
+    	}
+    	
+    	} catch(Exception e)
+    	{
+    		System.out.println("Something happened " + e);
+    	}
+    }
+}
